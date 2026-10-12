@@ -738,4 +738,63 @@ KEOF
                           val vw = mp.videoWidth.toFloat()
                           val vh = mp.videoHeight.toFloat()
                           if (vw > 0 && vh > 0) {
-              
+                              val dm = resources.displayMetrics
+                              val maxW = dm.widthPixels.toFloat()
+                              val maxH = dm.heightPixels.toFloat()
+                              val scale = minOf(maxW / vw, maxH / vh)
+                              vv.layoutParams = FrameLayout.LayoutParams((vw * scale).toInt(), (vh * scale).toInt(), Gravity.CENTER)
+                          }
+                          mp.isLooping = false
+                          mp.start()
+                      }
+                      root.addView(vv, FrameLayout.LayoutParams(MATCH, MATCH, Gravity.CENTER))
+                  } else {
+                      val iv = ImageView(this)
+                      iv.scaleType = ImageView.ScaleType.FIT_CENTER
+                      iv.setImageBitmap(decode(f.absolutePath, 2048))
+                      root.addView(iv, FrameLayout.LayoutParams(MATCH, MATCH, Gravity.CENTER))
+                  }
+                  val bar = LinearLayout(this).apply {
+                      gravity = Gravity.CENTER_VERTICAL
+                      setPadding(dp(14), dp(14), dp(14), dp(14))
+                      setBackgroundColor(Color.argb(150, 0, 0, 0))
+                      fitsSystemWindows = true
+                  }
+                  bar.addView(pill("Tutup", panel, Color.WHITE) { d.dismiss() })
+                  bar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                  bar.addView(pill("Hapus", red, Color.WHITE) {
+                      AlertDialog.Builder(this)
+                          .setMessage("Hapus file ini dari brankas? Tidak bisa dikembalikan.")
+                          .setPositiveButton("Hapus") { _, _ ->
+                              f.delete()
+                              cache.remove(f.name)
+                              d.dismiss()
+                              reload()
+                          }
+                          .setNegativeButton("Batal", null)
+                          .show()
+                  })
+                  root.addView(bar, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.TOP))
+                  d.setContentView(root)
+                  d.setOnDismissListener {
+                      viewer = null
+                      requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                  }
+                  viewer = d
+                  d.show()
+              }
+          }
+          EOF
+
+      - name: Build APK release
+        run: gradle assembleRelease --no-daemon
+
+      - name: Beri nama APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk out/Hola.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hola
+          path: out/Hola.apk
