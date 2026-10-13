@@ -205,6 +205,8 @@ jobs:
               private var unlocked = false
               private var viewer: Dialog? = null
               private var selectMode = false
+              private var selectVideo = true
+              private fun kind() = if (selectVideo) "video" else "foto"
               private val selected = LinkedHashSet<File>()
 
               private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
@@ -404,7 +406,7 @@ jobs:
                       cell.img.tag = f.name
                       cell.badge.visibility = if (isVideo(f)) View.VISIBLE else View.GONE
                       if (selectMode) {
-                          val eligible = isVideo(f)
+                          val eligible = isVideo(f) == selectVideo
                           cell.dim.setBackgroundColor(Color.argb(if (eligible) 0 else 140, 0, 0, 0))
                           cell.check.visibility = if (eligible) View.VISIBLE else View.GONE
                           cell.check.text = if (selected.contains(f)) "✓" else ""
@@ -458,10 +460,15 @@ jobs:
                   head.addView(titleRow)
 
                   normalBar = LinearLayout(this).apply {
-                      orientation = LinearLayout.HORIZONTAL
+                      orientation = LinearLayout.VERTICAL
                       layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
                   }
-                  normalBar.addView(pill("Tambah", gold, Color.parseColor("#1B1608")) {
+                  val row1 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                  val row2 = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL
+                      layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
+                  }
+                  row1.addView(pill("Tambah", gold, Color.parseColor("#1B1608")) {
                       skipLock = true
                       val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                           addCategory(Intent.CATEGORY_OPENABLE)
@@ -471,9 +478,12 @@ jobs:
                       }
                       startActivityForResult(i, PICK)
                   })
-                  saveBtn = pill("Simpan Video", panel, Color.WHITE) { enterSelectMode() }
-                  normalBar.addView(saveBtn)
-                  normalBar.addView(pill("Kunci", panel, Color.WHITE) { showLock() })
+                  row1.addView(pill("Kunci", panel, Color.WHITE) { showLock() })
+                  saveBtn = pill("Simpan Video", panel, Color.WHITE) { enterSelectMode(true) }
+                  row2.addView(saveBtn)
+                  row2.addView(pill("Simpan Foto", panel, Color.WHITE) { enterSelectMode(false) })
+                  normalBar.addView(row1)
+                  normalBar.addView(row2)
                   head.addView(normalBar)
 
                   selectBar = LinearLayout(this).apply {
@@ -515,26 +525,27 @@ jobs:
 
               private fun onCellTap(f: File) {
                   if (!selectMode) { open(f); return }
-                  if (!isVideo(f)) { status("Hanya video yang bisa disimpan ke galeri."); return }
+                  if (isVideo(f) != selectVideo) { status("Pilih " + kind() + " saja."); return }
                   if (selected.contains(f)) {
                       selected.remove(f)
                   } else {
-                      if (selected.size >= MAX_SELECT) { status("Maksimal $MAX_SELECT video sekaligus."); return }
+                      if (selected.size >= MAX_SELECT) { status("Maksimal $MAX_SELECT ${kind()} sekaligus."); return }
                       selected.add(f)
                   }
                   confirmBtn.text = "Confirm (${selected.size})"
-                  status("${selected.size} dari $MAX_SELECT video dipilih")
+                  status("${selected.size} dari $MAX_SELECT ${kind()} dipilih")
                   gridAdapter.notifyDataSetChanged()
               }
 
-              private fun enterSelectMode() {
-                  if (files.none { isVideo(it) }) { status("Belum ada video di brankas."); return }
+              private fun enterSelectMode(video: Boolean) {
+                  selectVideo = video
+                  if (files.none { isVideo(it) == video }) { status("Belum ada " + kind() + " di brankas."); return }
                   selectMode = true
                   selected.clear()
                   normalBar.visibility = View.GONE
                   selectBar.visibility = View.VISIBLE
                   confirmBtn.text = "Confirm (0)"
-                  status("Pilih video yang mau disimpan ke galeri (maks $MAX_SELECT)")
+                  status("Pilih ${kind()} yang mau disimpan ke galeri (maks $MAX_SELECT)")
                   gridAdapter.notifyDataSetChanged()
               }
 
@@ -548,13 +559,14 @@ jobs:
               }
 
               private fun confirmSave() {
-                  if (selected.isEmpty()) { status("Pilih dulu minimal 1 video."); return }
+                  if (selected.isEmpty()) { status("Pilih dulu minimal 1 ${kind()}."); return }
                   if (Build.VERSION.SDK_INT < 29 &&
                       checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                       requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), REQ_PERM)
                       return
                   }
                   val toSave = selected.toList()
+                  val k = kind()
                   status("Menyimpan 0 dari ${toSave.size} ke galeri...")
                   io.execute {
                       var ok = 0
@@ -564,7 +576,7 @@ jobs:
                           ui.post { status("Menyimpan $n dari ${toSave.size} ke galeri...") }
                       }
                       ui.post {
-                          status("$ok video tersimpan ke galeri HP.")
+                          status("$ok $k tersimpan ke galeri HP.")
                           exitSelectMode()
                       }
                   }
@@ -581,33 +593,49 @@ jobs:
 
               private fun exportToGallery(f: File): Boolean {
                   try {
-                  val name = "Hola_${System.currentTimeMillis()}.mp4"
-                  if (Build.VERSION.SDK_INT >= 29) {
-                      val values = ContentValues().apply {
-                          put(MediaStore.Video.Media.DISPLAY_NAME, name)
-                          put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                          put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/Hola")
-                          put(MediaStore.Video.Media.IS_PENDING, 1)
+                      val video = isVideo(f)
+                      var mime = if (video) "video/mp4" else "image/jpeg"
+                      if (!video) {
+                          val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                          BitmapFactory.decodeFile(f.absolutePath, o)
+                          o.outMimeType?.let { mime = it }
                       }
-                      val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-                      contentResolver.openOutputStream(uri)!!.use { o -> f.inputStream().use { it.copyTo(o) } }
-                      values.clear()
-                      values.put(MediaStore.Video.Media.IS_PENDING, 0)
-                      contentResolver.update(uri, values, null, null)
-                  } else {
-                      val movies = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "Hola")
-                      movies.mkdirs()
-                      val out = File(movies, name)
-                      f.inputStream().use { inp -> out.outputStream().use { o -> inp.copyTo(o) } }
-                      val values = ContentValues().apply {
-                          put(MediaStore.Video.Media.DATA, out.absolutePath)
-                          put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                      val ext = when (mime) {
+                          "image/png" -> "png"
+                          "image/webp" -> "webp"
+                          "image/gif" -> "gif"
+                          "image/heic", "image/heif" -> "heic"
+                          else -> if (video) "mp4" else "jpg"
                       }
-                      contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
-                  }
-                  return true
+                      val name = "Hola_${System.currentTimeMillis()}.$ext"
+                      val collection = if (video) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                      if (Build.VERSION.SDK_INT >= 29) {
+                          val values = ContentValues().apply {
+                              put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                              put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                              put(MediaStore.MediaColumns.RELATIVE_PATH, if (video) "Movies/Hola" else "Pictures/Hola")
+                              put(MediaStore.MediaColumns.IS_PENDING, 1)
+                          }
+                          val uri = contentResolver.insert(collection, values) ?: return false
+                          contentResolver.openOutputStream(uri)!!.use { o -> f.inputStream().use { it.copyTo(o) } }
+                          values.clear()
+                          values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                          contentResolver.update(uri, values, null, null)
+                      } else {
+                          val base = Environment.getExternalStoragePublicDirectory(if (video) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES)
+                          val folder = File(base, "Hola")
+                          folder.mkdirs()
+                          val out = File(folder, name)
+                          f.inputStream().use { inp -> out.outputStream().use { o -> inp.copyTo(o) } }
+                          val values = ContentValues().apply {
+                              put(MediaStore.MediaColumns.DATA, out.absolutePath)
+                              put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                          }
+                          contentResolver.insert(collection, values)
+                      }
+                      return true
                   } catch (e: Exception) {
-                  return false
+                      return false
                   }
               }
 
@@ -689,22 +717,12 @@ jobs:
                   d.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                   val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
                   if (isVideo(f)) {
-                      requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
                       val vv = VideoView(this)
                       vv.setVideoPath(f.absolutePath)
                       val mc = MediaController(this)
                       mc.setAnchorView(vv)
                       vv.setMediaController(mc)
                       vv.setOnPreparedListener { mp ->
-                          val vw = mp.videoWidth.toFloat()
-                          val vh = mp.videoHeight.toFloat()
-                          if (vw > 0 && vh > 0) {
-                              val dm = resources.displayMetrics
-                              val maxW = dm.widthPixels.toFloat()
-                              val maxH = dm.heightPixels.toFloat()
-                              val scale = minOf(maxW / vw, maxH / vh)
-                              vv.layoutParams = FrameLayout.LayoutParams((vw * scale).toInt(), (vh * scale).toInt(), Gravity.CENTER)
-                          }
                           mp.isLooping = false
                           mp.start()
                       }
@@ -722,6 +740,16 @@ jobs:
                       fitsSystemWindows = true
                   }
                   bar.addView(pill("Tutup", panel, Color.WHITE) { d.dismiss() })
+                  if (isVideo(f)) {
+                      var land = false
+                      val rot = pill("Landscape", panel, Color.WHITE) { }
+                      rot.setOnClickListener {
+                          land = !land
+                          requestedOrientation = if (land) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                          rot.text = if (land) "Potret" else "Landscape"
+                      }
+                      bar.addView(rot)
+                  }
                   bar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
                   bar.addView(pill("Hapus", red, Color.WHITE) {
                       AlertDialog.Builder(this)
