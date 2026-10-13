@@ -579,7 +579,8 @@ jobs:
                   }
               }
 
-              private fun exportToGallery(f: File): Boolean = try {
+              private fun exportToGallery(f: File): Boolean {
+                  try {
                   val name = "Hola_${System.currentTimeMillis()}.mp4"
                   if (Build.VERSION.SDK_INT >= 29) {
                       val values = ContentValues().apply {
@@ -604,9 +605,10 @@ jobs:
                       }
                       contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
                   }
-                  true
-              } catch (e: Exception) {
-                  false
+                  return true
+                  } catch (e: Exception) {
+                  return false
+                  }
               }
 
               private fun reload() {
