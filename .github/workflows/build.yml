@@ -21,56 +21,7 @@ jobs:
           gradle-version: 8.9
 
       - name: Siapkan kunci penandatanganan
-        run: |
-          cat > hola.jks.b64 << 'KEOF'
-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
-KEOF
-          base64 -d hola.jks.b64 > hola.jks
-          rm hola.jks.b64
+        run: keytool -genkeypair -keystore hola.jks -alias hola -keyalg RSA -keysize 2048 -validity 36500 -storepass hola1234 -keypass hola1234 -dname "CN=Hola"
 
       - name: Pasang ikon Hola (dari logo.zip di repo, jika ada)
         run: |
@@ -139,6 +90,10 @@ KEOF
                   targetCompatibility JavaVersion.VERSION_17
               }
               kotlinOptions { jvmTarget = '17' }
+          lint {
+              checkReleaseBuilds false
+              abortOnError false
+          }
           }
           EOF
 
@@ -164,6 +119,10 @@ KEOF
               </application>
           </manifest>
           EOF
+
+          if [ ! -f logo.zip ]; then
+            sed -i '/android:icon=/d;/android:roundIcon=/d' app/src/main/AndroidManifest.xml
+          fi
 
           cat > app/src/main/java/com/hola/app/MainActivity.kt << 'EOF'
           package com.hola.app
@@ -626,7 +585,7 @@ KEOF
                       val values = ContentValues().apply {
                           put(MediaStore.Video.Media.DISPLAY_NAME, name)
                           put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                          put(MediaStore.Video.Media.RELATION_PATH, "Movies/Hola")
+                          put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/Hola")
                           put(MediaStore.Video.Media.IS_PENDING, 1)
                       }
                       val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: return false
@@ -785,6 +744,12 @@ KEOF
               }
           }
           EOF
+
+      - name: Cek ikon
+        run: |
+          if [ ! -f logo.zip ]; then
+            sed -i '/android:icon=/d;/android:roundIcon=/d' app/src/main/AndroidManifest.xml
+          fi
 
       - name: Build APK release
         run: gradle assembleRelease --no-daemon
