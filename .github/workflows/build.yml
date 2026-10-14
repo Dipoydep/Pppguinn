@@ -37,6 +37,49 @@ jobs:
         run: |
           mkdir -p app/src/main/java/com/hola/app
 
+          mkdir -p app/src/main/res/drawable
+
+          cat > app/src/main/res/drawable/ic_lock.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:pathData="M6.5,10H17.5A2.5,2.5 0 0 1 20,12.5V18.5A2.5,2.5 0 0 1 17.5,21H6.5A2.5,2.5 0 0 1 4,18.5V12.5A2.5,2.5 0 0 1 6.5,10Z"
+                  android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.8"
+                  android:strokeLineCap="round" android:strokeLineJoin="round"/>
+              <path android:pathData="M8,10V7A4,4 0 0 1 16,7V10"
+                  android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.8"
+                  android:strokeLineCap="round" android:strokeLineJoin="round"/>
+              <path android:pathData="M12,14.3A1.2,1.2 0 1 0 12,16.7A1.2,1.2 0 1 0 12,14.3Z"
+                  android:fillColor="#FFFFFF"/>
+              <path android:pathData="M12,16.5V18.5"
+                  android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.8"
+                  android:strokeLineCap="round" android:strokeLineJoin="round"/>
+          </vector>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_backspace.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:pathData="M21,5H8L2,12L8,19H21A1,1 0 0 0 22,18V6A1,1 0 0 0 21,5Z"
+                  android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.8"
+                  android:strokeLineCap="round" android:strokeLineJoin="round"/>
+              <path android:pathData="M14,9L10,15M10,9L14,15"
+                  android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.8"
+                  android:strokeLineCap="round" android:strokeLineJoin="round"/>
+          </vector>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_close.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:pathData="M18,6L6,18M6,6L18,18"
+                  android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="1.8"
+                  android:strokeLineCap="round" android:strokeLineJoin="round"/>
+          </vector>
+          EOF
+
           cat > settings.gradle << 'EOF'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositories { google(); mavenCentral() } }
@@ -127,6 +170,7 @@ jobs:
           cat > app/src/main/java/com/hola/app/MainActivity.kt << 'EOF'
           package com.hola.app
 
+          import android.animation.ObjectAnimator
           import android.app.Activity
           import android.app.AlertDialog
           import android.app.Dialog
@@ -134,6 +178,7 @@ jobs:
           import android.content.Context
           import android.content.Intent
           import android.content.SharedPreferences
+          import android.content.res.ColorStateList
           import android.content.pm.ActivityInfo
           import android.content.pm.PackageManager
           import android.graphics.Bitmap
@@ -141,7 +186,10 @@ jobs:
           import android.graphics.Color
           import android.graphics.Matrix
           import android.graphics.Typeface
+          import android.graphics.drawable.ColorDrawable
           import android.graphics.drawable.GradientDrawable
+          import android.graphics.drawable.LayerDrawable
+          import android.graphics.drawable.RippleDrawable
           import android.media.ExifInterface
           import android.media.MediaMetadataRetriever
           import android.net.Uri
@@ -153,6 +201,7 @@ jobs:
           import android.provider.MediaStore
           import android.util.LruCache
           import android.view.Gravity
+          import android.view.HapticFeedbackConstants
           import android.view.View
           import android.view.ViewGroup
           import android.view.WindowManager
@@ -176,13 +225,18 @@ jobs:
           private const val PICK = 7
           private const val REQ_PERM = 8
           private const val MAX_SELECT = 10
+          private const val PIN_LEN = 6
 
           class MainActivity : Activity() {
-              private val bg = Color.parseColor("#101A2B")
-              private val panel = Color.parseColor("#182640")
-              private val gold = Color.parseColor("#C9A24B")
-              private val red = Color.parseColor("#E5675A")
-              private val muted = Color.parseColor("#9AA9C4")
+              private val bg = Color.parseColor("#0A0F0D")
+              private val panel = Color.parseColor("#121A17")
+              private val stroke = Color.parseColor("#1F2E28")
+              private val txt = Color.parseColor("#E6F0EC")
+              private val gold = Color.parseColor("#4ADE9A")
+              private val red = Color.parseColor("#FF5C6D")
+              private val muted = Color.parseColor("#5A7268")
+              private val soft = Color.parseColor("#8FA89D")
+              private val onAccent = Color.parseColor("#052217")
 
               private lateinit var prefs: SharedPreferences
               private lateinit var dir: File
@@ -238,7 +292,7 @@ jobs:
                   textSize = 13f
                   typeface = Typeface.DEFAULT_BOLD
                   setTextColor(fg)
-                  background = GradientDrawable().apply { cornerRadius = dp(10).toFloat(); setColor(bgc) }
+                  background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(bgc); if (bgc == panel) setStroke(dp(1), stroke) }
                   stateListAnimator = null
                   minimumWidth = 0
                   minimumHeight = 0
@@ -247,23 +301,50 @@ jobs:
                   setOnClickListener { click() }
               }
 
-              private fun keyBtn(t: String, click: () -> Unit) = Button(this).apply {
-                  text = t
-                  textSize = 24f
-                  isAllCaps = false
-                  setTextColor(Color.WHITE)
-                  background = GradientDrawable().apply {
-                      shape = GradientDrawable.OVAL
-                      setColor(panel)
-                      setStroke(dp(1), Color.parseColor("#2A3B5C"))
+              private fun glowBg(): LayerDrawable {
+                  val glow = GradientDrawable().apply {
+                      gradientType = GradientDrawable.RADIAL_GRADIENT
+                      gradientRadius = resources.displayMetrics.widthPixels * 0.9f
+                      setGradientCenter(0.5f, 0.4f)
+                      colors = intArrayOf(Color.argb(28, 74, 222, 154), Color.TRANSPARENT)
                   }
-                  stateListAnimator = null
-                  minimumWidth = 0
-                  minimumHeight = 0
-                  setPadding(0, 0, 0, 0)
-                  gravity = Gravity.CENTER
-                  layoutParams = LinearLayout.LayoutParams(dp(72), dp(72)).apply { setMargins(dp(8), dp(8), dp(8), dp(8)) }
-                  setOnClickListener { click() }
+                  return LayerDrawable(arrayOf(ColorDrawable(bg), glow))
+              }
+
+              private fun iconView(res: Int, sizeDp: Int, color: Int) = ImageView(this).apply {
+                  setImageResource(res)
+                  setColorFilter(color)
+                  layoutParams = FrameLayout.LayoutParams(dp(sizeDp), dp(sizeDp), Gravity.CENTER)
+              }
+
+              private fun keyCell(label: String?, icon: Int, action: Boolean, click: () -> Unit): View {
+                  val size = dp(72)
+                  val mask = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) }
+                  val cell = FrameLayout(this)
+                  cell.layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(dp(8), dp(8), dp(8), dp(8)) }
+                  if (action) {
+                      cell.background = RippleDrawable(ColorStateList.valueOf(Color.argb(45, 74, 222, 154)), null, mask)
+                  } else {
+                      val content = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(panel); setStroke(dp(1), stroke) }
+                      cell.background = RippleDrawable(ColorStateList.valueOf(Color.argb(90, 74, 222, 154)), content, mask)
+                  }
+                  cell.isClickable = true
+                  cell.setOnClickListener {
+                      it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                      click()
+                  }
+                  if (label != null) {
+                      val tv = TextView(this)
+                      tv.text = label
+                      tv.textSize = 22f
+                      tv.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                      tv.setTextColor(txt)
+                      tv.gravity = Gravity.CENTER
+                      cell.addView(tv, FrameLayout.LayoutParams(MATCH, MATCH))
+                  } else {
+                      cell.addView(iconView(icon, 24, muted))
+                  }
+                  return cell
               }
 
               private fun showLock() {
@@ -274,94 +355,134 @@ jobs:
                   selectMode = false
                   selected.clear()
                   buf = ""
+                  var busy = false
+
                   val root = LinearLayout(this).apply {
                       orientation = LinearLayout.VERTICAL
                       gravity = Gravity.CENTER
-                      setBackgroundColor(bg)
-                      fitsSystemWindows = true
-                      layoutParams = LinearLayout.LayoutParams(MATCH, MATCH)
                   }
+                  val iconWrap = FrameLayout(this).apply {
+                      background = GradientDrawable(
+                          GradientDrawable.Orientation.TL_BR,
+                          intArrayOf(Color.parseColor("#18241F"), Color.parseColor("#0F1714"))
+                      ).apply { cornerRadius = dp(20).toFloat(); setStroke(dp(1), stroke) }
+                  }
+                  val lockIcon = iconView(R.drawable.ic_lock, 26, muted)
+                  iconWrap.addView(lockIcon)
+                  root.addView(iconWrap, LinearLayout.LayoutParams(dp(64), dp(64)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+
                   val title = TextView(this).apply {
-                      text = "Hola"
-                      textSize = 26f
-                      typeface = Typeface.SERIF
-                      setTextColor(Color.WHITE)
+                      textSize = 15f
+                      typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                      setTextColor(txt)
                       gravity = Gravity.CENTER
-                      setPadding(0, 0, 0, dp(20))
                   }
-                  val dots = TextView(this).apply {
-                      textSize = 26f
-                      setTextColor(gold)
-                      gravity = Gravity.CENTER
-                      letterSpacing = 0.3f
-                      layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { gravity = Gravity.CENTER_HORIZONTAL }
-                  }
-                  val msg = TextView(this).apply {
-                      textSize = 14f
+                  val sub = TextView(this).apply {
+                      textSize = 12.5f
                       setTextColor(muted)
                       gravity = Gravity.CENTER
-                      setPadding(0, dp(6), 0, dp(14))
-                      layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { gravity = Gravity.CENTER_HORIZONTAL }
                   }
+                  root.addView(title, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(16); gravity = Gravity.CENTER_HORIZONTAL })
+                  root.addView(sub, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(8); gravity = Gravity.CENTER_HORIZONTAL })
+
+                  val dotRow = LinearLayout(this).apply { gravity = Gravity.CENTER }
+                  val dots = List(PIN_LEN) {
+                      View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(14), dp(14)).apply { setMargins(dp(9), 0, dp(9), 0) } }
+                  }
+                  dots.forEach { dotRow.addView(it) }
+                  root.addView(dotRow, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(40); gravity = Gravity.CENTER_HORIZONTAL })
+
                   fun prompt() {
-                      msg.text = when {
-                          prefs.contains("pin") -> "Masukkan PIN"
-                          first == null -> "Buat PIN 4 angka"
-                          else -> "Ulangi PIN untuk konfirmasi"
+                      when {
+                          prefs.contains("pin") -> { title.text = "Masukkan PIN"; sub.text = "$PIN_LEN digit untuk membuka" }
+                          first == null -> { title.text = "Buat PIN"; sub.text = "$PIN_LEN digit untuk mengunci" }
+                          else -> { title.text = "Ulangi PIN"; sub.text = "Masukkan PIN yang sama" }
                       }
                   }
-                  fun refresh() { dots.text = "●".repeat(buf.length) + "○".repeat(4 - buf.length) }
-                  fun press(k: String) {
-                      if (k == "⌫") buf = buf.dropLast(1) else if (buf.length < 4) buf += k
-                      refresh()
-                      if (buf.length < 4) return
+                  fun paintDots(error: Boolean = false) {
+                      dots.forEachIndexed { i, v ->
+                          val on = i < buf.length
+                          val fillC = if (error) red else if (on) gold else Color.TRANSPARENT
+                          val strokeC = if (error) red else if (on) gold else stroke
+                          v.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(fillC); setStroke(dp(1), strokeC) }
+                          val sc = if (on || error) 1.15f else 1f
+                          v.animate().scaleX(sc).scaleY(sc).setDuration(180).start()
+                      }
+                  }
+                  fun wrong(message: String) {
+                      paintDots(true)
+                      lockIcon.setColorFilter(red)
+                      sub.text = message
+                      val d = dp(8).toFloat()
+                      ObjectAnimator.ofFloat(iconWrap, "translationX", 0f, -d, d, -d, d, -d / 2, d / 2, 0f).setDuration(500).start()
+                      ui.postDelayed({
+                          buf = ""
+                          busy = false
+                          lockIcon.setColorFilter(muted)
+                          paintDots()
+                          prompt()
+                      }, 600)
+                  }
+                  fun submit() {
+                      if (buf.length != PIN_LEN) return
                       val h = hash(buf)
-                      buf = ""
-                      refresh()
                       val saved = prefs.getString("pin", null)
                       if (saved != null) {
-                          if (h == saved) showVault() else msg.text = "PIN salah, coba lagi"
+                          if (h == saved) { buf = ""; showVault() } else wrong("PIN salah, coba lagi")
                       } else if (first == null) {
                           first = h
+                          buf = ""
+                          busy = false
+                          paintDots()
                           prompt()
                       } else if (first == h) {
                           prefs.edit().putString("pin", h).apply()
                           first = null
+                          buf = ""
                           showVault()
                       } else {
                           first = null
-                          msg.text = "PIN tidak sama. Buat PIN baru"
+                          wrong("PIN tidak sama, buat ulang")
                       }
                   }
-                  root.addView(title)
-                  root.addView(dots)
-                  root.addView(msg)
-                  val padBox = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      gravity = Gravity.CENTER_HORIZONTAL
-                      layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
-                  }
-                  val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("", "0", "⌫"))
-                  for (row in rows) {
-                      val r = LinearLayout(this).apply {
-                          orientation = LinearLayout.HORIZONTAL
-                          gravity = Gravity.CENTER
-                          layoutParams = LinearLayout.LayoutParams(WRAP, WRAP)
+                  fun press(d: String) {
+                      if (busy || buf.length >= PIN_LEN) return
+                      buf += d
+                      paintDots()
+                      if (buf.length == PIN_LEN) {
+                          busy = true
+                          ui.postDelayed({ submit() }, 180)
                       }
-                      for (k in row) {
-                          if (k.isEmpty()) {
-                              r.addView(View(this).apply {
-                                  layoutParams = LinearLayout.LayoutParams(dp(72), dp(72)).apply { setMargins(dp(8), dp(8), dp(8), dp(8)) }
-                              })
-                          } else r.addView(keyBtn(k) { press(k) })
-                      }
-                      padBox.addView(r)
                   }
-                  root.addView(padBox)
-                  refresh()
+                  fun digit(d: String) = keyCell(d, 0, false) { press(d) }
+                  fun row(vararg cells: View) = LinearLayout(this).apply {
+                      gravity = Gravity.CENTER
+                      cells.forEach { addView(it) }
+                  }
+
+                  val pad = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                  pad.addView(row(digit("1"), digit("2"), digit("3")))
+                  pad.addView(row(digit("4"), digit("5"), digit("6")))
+                  pad.addView(row(digit("7"), digit("8"), digit("9")))
+                  pad.addView(row(
+                      keyCell(null, R.drawable.ic_backspace, true) { if (!busy) { buf = buf.dropLast(1); paintDots() } },
+                      digit("0"),
+                      keyCell(null, R.drawable.ic_close, true) { if (!busy) { buf = ""; paintDots() } }
+                  ))
+                  root.addView(pad, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(32); gravity = Gravity.CENTER_HORIZONTAL })
+
+                  paintDots()
                   prompt()
-                  setContentView(root)
+                  val sv = ScrollView(this).apply {
+                      isFillViewport = true
+                      isVerticalScrollBarEnabled = false
+                      fitsSystemWindows = true
+                      background = glowBg()
+                      addView(root)
+                  }
+                  setContentView(sv)
               }
+
 
               /* ---------- Brankas ---------- */
 
@@ -377,7 +498,7 @@ jobs:
                   val check = TextView(c).apply {
                       textSize = 13f
                       gravity = Gravity.CENTER
-                      setTextColor(Color.WHITE)
+                      setTextColor(onAccent)
                       background = GradientDrawable().apply {
                           shape = GradientDrawable.OVAL
                           setColor(Color.argb(140, 0, 0, 0))
@@ -439,7 +560,7 @@ jobs:
                   unlocked = true
                   val root = LinearLayout(this).apply {
                       orientation = LinearLayout.VERTICAL
-                      setBackgroundColor(bg)
+                      background = glowBg()
                       fitsSystemWindows = true
                   }
                   val head = LinearLayout(this).apply {
@@ -451,10 +572,10 @@ jobs:
                   titles.addView(TextView(this).apply {
                       text = "Hola"
                       textSize = 22f
-                      typeface = Typeface.SERIF
-                      setTextColor(Color.WHITE)
+                      typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                      setTextColor(txt)
                   })
-                  countTv = TextView(this).apply { textSize = 13f; setTextColor(muted) }
+                  countTv = TextView(this).apply { textSize = 13f; setTextColor(soft) }
                   titles.addView(countTv)
                   titleRow.addView(titles, LinearLayout.LayoutParams(0, WRAP, 1f))
                   head.addView(titleRow)
@@ -468,7 +589,7 @@ jobs:
                       orientation = LinearLayout.HORIZONTAL
                       layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(8) }
                   }
-                  row1.addView(pill("Tambah", gold, Color.parseColor("#1B1608")) {
+                  row1.addView(pill("Tambah", gold, onAccent) {
                       skipLock = true
                       val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                           addCategory(Intent.CATEGORY_OPENABLE)
@@ -478,10 +599,10 @@ jobs:
                       }
                       startActivityForResult(i, PICK)
                   })
-                  row1.addView(pill("Kunci", panel, Color.WHITE) { showLock() })
-                  saveBtn = pill("Simpan Video", panel, Color.WHITE) { enterSelectMode(true) }
+                  row1.addView(pill("Kunci", panel, txt) { showLock() })
+                  saveBtn = pill("Simpan Video", panel, txt) { enterSelectMode(true) }
                   row2.addView(saveBtn)
-                  row2.addView(pill("Simpan Foto", panel, Color.WHITE) { enterSelectMode(false) })
+                  row2.addView(pill("Simpan Foto", panel, txt) { enterSelectMode(false) })
                   normalBar.addView(row1)
                   normalBar.addView(row2)
                   head.addView(normalBar)
@@ -491,8 +612,8 @@ jobs:
                       visibility = View.GONE
                       layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(10) }
                   }
-                  cancelBtn = pill("Batal", panel, Color.WHITE) { exitSelectMode() }
-                  confirmBtn = pill("Confirm (0)", gold, Color.parseColor("#1B1608")) { confirmSave() }
+                  cancelBtn = pill("Batal", panel, txt) { exitSelectMode() }
+                  confirmBtn = pill("Confirm (0)", gold, onAccent) { confirmSave() }
                   selectBar.addView(cancelBtn)
                   selectBar.addView(confirmBtn)
                   head.addView(selectBar)
@@ -504,7 +625,7 @@ jobs:
                   }
                   emptyTv = TextView(this).apply {
                       text = "Belum ada file. Ketuk Tambah untuk memilih foto atau video."
-                      setTextColor(muted)
+                      setTextColor(soft)
                       gravity = Gravity.CENTER
                       setPadding(dp(28), dp(48), dp(28), dp(48))
                   }
@@ -739,10 +860,10 @@ jobs:
                       setBackgroundColor(Color.argb(150, 0, 0, 0))
                       fitsSystemWindows = true
                   }
-                  bar.addView(pill("Tutup", panel, Color.WHITE) { d.dismiss() })
+                  bar.addView(pill("Tutup", panel, txt) { d.dismiss() })
                   if (isVideo(f)) {
                       var land = false
-                      val rot = pill("Landscape", panel, Color.WHITE) { }
+                      val rot = pill("Landscape", panel, txt) { }
                       rot.setOnClickListener {
                           land = !land
                           requestedOrientation = if (land) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
